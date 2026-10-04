@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#090b18">
+<title>GestureAI — Smart Hand Tracker</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous">
+const _origInitAI=initAI; let latestFace=null,latestPose=null,trail=[],lastTrail=null,personCount=0,personVisible=false,lastPerson=0;
+function setCameraMode(mode){facingMode=mode;mirror=mode==='user';if(camera){camera.stop();setStatus('Mengganti kamera…');initAI()}}
+function faceExpression(l){const mouth=Math.hypot(l[13].x-l[14].x,l[13].y-l[14].y),width=Math.hypot(l[61].x-l[291].x,l[61].y-l[291].y),e=(Math.hypot(l[159].x-l[145].x,l[159].y-l[145].y)+Math.hypot(l[386].x-l[374].x,l[386].y-l[374].y))/2; if(mouth>.065&&e>.025)return ['Wajah ngakak 😂','Wajah ngakak']; if(width/(mouth+.0001)>5&&mouth>.018)return ['Wajah senyum 😄','Wajah senyum']; if(mouth<.018)return ['Wajah cemberut 😗','Wajah cemberut']; return ['Wajah senang 😊','Wajah senang']}
+function showEvent(t){const e=$('eventBadge');e.textContent=t;e.style.opacity=1;clearTimeout(window._ev);window._ev=setTimeout(()=>e.style.opacity=0,900)}
+const oldOnResults=onResults; onResults=function(r){oldOnResults(r); if($('drawToggle')?.checked&&r.multiHandLandmarks?.[0]){const l=r.multiHandLandmarks[0],x=(1-l[8].x)*640,y=l[8].y*480;if(lastTrail&&Math.hypot(x-lastTrail.x,y-lastTrail.y)<90)trail.push({x,y});else trail=[];lastTrail={x,y};if(trail.length>80)trail.shift();ctx.save();ctx.strokeStyle='#64e8ff';ctx.lineWidth=5;ctx.lineCap='round';ctx.shadowBlur=12;ctx.shadowColor='#64e8ff';ctx.beginPath();trail.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.restore()}else{trail=[];lastTrail=null}};
+// Reconfigure Hands to allow two hands while preserving the original detection pipeline.
+const _oldStart=startApp; startApp=async function(){await _oldStart()};
+$('faceToggle').onchange=()=>toast($('faceToggle').checked?'😊 Deteksi wajah aktif':'😊 Deteksi wajah mati'); $('drawToggle').onchange=()=>{trail=[];lastTrail=null;toast($('drawToggle').checked?'✍️ Tracking gambar aktif':'✍️ Tracking gambar mati')}; $('twoHandToggle').onchange=()=>toast($('twoHandToggle').checked?'👐 Tracking 2 tangan aktif':'👐 Tracking 2 tangan mati'); $('personToggle').onchange=()=>toast($('personToggle').checked?'🧍 Penghitung orang aktif':'🧍 Penghitung orang mati');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous">
+const _origInitAI=initAI; let latestFace=null,latestPose=null,trail=[],lastTrail=null,personCount=0,personVisible=false,lastPerson=0;
+function setCameraMode(mode){facingMode=mode;mirror=mode==='user';if(camera){camera.stop();setStatus('Mengganti kamera…');initAI()}}
+function faceExpression(l){const mouth=Math.hypot(l[13].x-l[14].x,l[13].y-l[14].y),width=Math.hypot(l[61].x-l[291].x,l[61].y-l[291].y),e=(Math.hypot(l[159].x-l[145].x,l[159].y-l[145].y)+Math.hypot(l[386].x-l[374].x,l[386].y-l[374].y))/2; if(mouth>.065&&e>.025)return ['Wajah ngakak 😂','Wajah ngakak']; if(width/(mouth+.0001)>5&&mouth>.018)return ['Wajah senyum 😄','Wajah senyum']; if(mouth<.018)return ['Wajah cemberut 😗','Wajah cemberut']; return ['Wajah senang 😊','Wajah senang']}
+function showEvent(t){const e=$('eventBadge');e.textContent=t;e.style.opacity=1;clearTimeout(window._ev);window._ev=setTimeout(()=>e.style.opacity=0,900)}
+const oldOnResults=onResults; onResults=function(r){oldOnResults(r); if($('drawToggle')?.checked&&r.multiHandLandmarks?.[0]){const l=r.multiHandLandmarks[0],x=(1-l[8].x)*640,y=l[8].y*480;if(lastTrail&&Math.hypot(x-lastTrail.x,y-lastTrail.y)<90)trail.push({x,y});else trail=[];lastTrail={x,y};if(trail.length>80)trail.shift();ctx.save();ctx.strokeStyle='#64e8ff';ctx.lineWidth=5;ctx.lineCap='round';ctx.shadowBlur=12;ctx.shadowColor='#64e8ff';ctx.beginPath();trail.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.restore()}else{trail=[];lastTrail=null}};
+// Reconfigure Hands to allow two hands while preserving the original detection pipeline.
+const _oldStart=startApp; startApp=async function(){await _oldStart()};
+$('faceToggle').onchange=()=>toast($('faceToggle').checked?'😊 Deteksi wajah aktif':'😊 Deteksi wajah mati'); $('drawToggle').onchange=()=>{trail=[];lastTrail=null;toast($('drawToggle').checked?'✍️ Tracking gambar aktif':'✍️ Tracking gambar mati')}; $('twoHandToggle').onchange=()=>toast($('twoHandToggle').checked?'👐 Tracking 2 tangan aktif':'👐 Tracking 2 tangan mati'); $('personToggle').onchange=()=>toast($('personToggle').checked?'🧍 Penghitung orang aktif':'🧍 Penghitung orang mati');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous">
+const _origInitAI=initAI; let latestFace=null,latestPose=null,trail=[],lastTrail=null,personCount=0,personVisible=false,lastPerson=0;
+function setCameraMode(mode){facingMode=mode;mirror=mode==='user';if(camera){camera.stop();setStatus('Mengganti kamera…');initAI()}}
+function faceExpression(l){const mouth=Math.hypot(l[13].x-l[14].x,l[13].y-l[14].y),width=Math.hypot(l[61].x-l[291].x,l[61].y-l[291].y),e=(Math.hypot(l[159].x-l[145].x,l[159].y-l[145].y)+Math.hypot(l[386].x-l[374].x,l[386].y-l[374].y))/2; if(mouth>.065&&e>.025)return ['Wajah ngakak 😂','Wajah ngakak']; if(width/(mouth+.0001)>5&&mouth>.018)return ['Wajah senyum 😄','Wajah senyum']; if(mouth<.018)return ['Wajah cemberut 😗','Wajah cemberut']; return ['Wajah senang 😊','Wajah senang']}
+function showEvent(t){const e=$('eventBadge');e.textContent=t;e.style.opacity=1;clearTimeout(window._ev);window._ev=setTimeout(()=>e.style.opacity=0,900)}
+const oldOnResults=onResults; onResults=function(r){oldOnResults(r); if($('drawToggle')?.checked&&r.multiHandLandmarks?.[0]){const l=r.multiHandLandmarks[0],x=(1-l[8].x)*640,y=l[8].y*480;if(lastTrail&&Math.hypot(x-lastTrail.x,y-lastTrail.y)<90)trail.push({x,y});else trail=[];lastTrail={x,y};if(trail.length>80)trail.shift();ctx.save();ctx.strokeStyle='#64e8ff';ctx.lineWidth=5;ctx.lineCap='round';ctx.shadowBlur=12;ctx.shadowColor='#64e8ff';ctx.beginPath();trail.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.restore()}else{trail=[];lastTrail=null}};
+// Reconfigure Hands to allow two hands while preserving the original detection pipeline.
+const _oldStart=startApp; startApp=async function(){await _oldStart()};
+$('faceToggle').onchange=()=>toast($('faceToggle').checked?'😊 Deteksi wajah aktif':'😊 Deteksi wajah mati'); $('drawToggle').onchange=()=>{trail=[];lastTrail=null;toast($('drawToggle').checked?'✍️ Tracking gambar aktif':'✍️ Tracking gambar mati')}; $('twoHandToggle').onchange=()=>toast($('twoHandToggle').checked?'👐 Tracking 2 tangan aktif':'👐 Tracking 2 tangan mati'); $('personToggle').onchange=()=>toast($('personToggle').checked?'🧍 Penghitung orang aktif':'🧍 Penghitung orang mati');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous">
+const _origInitAI=initAI; let latestFace=null,latestPose=null,trail=[],lastTrail=null,personCount=0,personVisible=false,lastPerson=0;
+function setCameraMode(mode){facingMode=mode;mirror=mode==='user';if(camera){camera.stop();setStatus('Mengganti kamera…');initAI()}}
+function faceExpression(l){const mouth=Math.hypot(l[13].x-l[14].x,l[13].y-l[14].y),width=Math.hypot(l[61].x-l[291].x,l[61].y-l[291].y),e=(Math.hypot(l[159].x-l[145].x,l[159].y-l[145].y)+Math.hypot(l[386].x-l[374].x,l[386].y-l[374].y))/2; if(mouth>.065&&e>.025)return ['Wajah ngakak 😂','Wajah ngakak']; if(width/(mouth+.0001)>5&&mouth>.018)return ['Wajah senyum 😄','Wajah senyum']; if(mouth<.018)return ['Wajah cemberut 😗','Wajah cemberut']; return ['Wajah senang 😊','Wajah senang']}
+function showEvent(t){const e=$('eventBadge');e.textContent=t;e.style.opacity=1;clearTimeout(window._ev);window._ev=setTimeout(()=>e.style.opacity=0,900)}
+const oldOnResults=onResults; onResults=function(r){oldOnResults(r); if($('drawToggle')?.checked&&r.multiHandLandmarks?.[0]){const l=r.multiHandLandmarks[0],x=(1-l[8].x)*640,y=l[8].y*480;if(lastTrail&&Math.hypot(x-lastTrail.x,y-lastTrail.y)<90)trail.push({x,y});else trail=[];lastTrail={x,y};if(trail.length>80)trail.shift();ctx.save();ctx.strokeStyle='#64e8ff';ctx.lineWidth=5;ctx.lineCap='round';ctx.shadowBlur=12;ctx.shadowColor='#64e8ff';ctx.beginPath();trail.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.restore()}else{trail=[];lastTrail=null}};
+// Reconfigure Hands to allow two hands while preserving the original detection pipeline.
+const _oldStart=startApp; startApp=async function(){await _oldStart()};
+$('faceToggle').onchange=()=>toast($('faceToggle').checked?'😊 Deteksi wajah aktif':'😊 Deteksi wajah mati'); $('drawToggle').onchange=()=>{trail=[];lastTrail=null;toast($('drawToggle').checked?'✍️ Tracking gambar aktif':'✍️ Tracking gambar mati')}; $('twoHandToggle').onchange=()=>toast($('twoHandToggle').checked?'👐 Tracking 2 tangan aktif':'👐 Tracking 2 tangan mati'); $('personToggle').onchange=()=>toast($('personToggle').checked?'🧍 Penghitung orang aktif':'🧍 Penghitung orang mati');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous">
+const _origInitAI=initAI; let latestFace=null,latestPose=null,trail=[],lastTrail=null,personCount=0,personVisible=false,lastPerson=0;
+function setCameraMode(mode){facingMode=mode;mirror=mode==='user';if(camera){camera.stop();setStatus('Mengganti kamera…');initAI()}}
+function faceExpression(l){const mouth=Math.hypot(l[13].x-l[14].x,l[13].y-l[14].y),width=Math.hypot(l[61].x-l[291].x,l[61].y-l[291].y),e=(Math.hypot(l[159].x-l[145].x,l[159].y-l[145].y)+Math.hypot(l[386].x-l[374].x,l[386].y-l[374].y))/2; if(mouth>.065&&e>.025)return ['Wajah ngakak 😂','Wajah ngakak']; if(width/(mouth+.0001)>5&&mouth>.018)return ['Wajah senyum 😄','Wajah senyum']; if(mouth<.018)return ['Wajah cemberut 😗','Wajah cemberut']; return ['Wajah senang 😊','Wajah senang']}
+function showEvent(t){const e=$('eventBadge');e.textContent=t;e.style.opacity=1;clearTimeout(window._ev);window._ev=setTimeout(()=>e.style.opacity=0,900)}
+const oldOnResults=onResults; onResults=function(r){oldOnResults(r); if($('drawToggle')?.checked&&r.multiHandLandmarks?.[0]){const l=r.multiHandLandmarks[0],x=(1-l[8].x)*640,y=l[8].y*480;if(lastTrail&&Math.hypot(x-lastTrail.x,y-lastTrail.y)<90)trail.push({x,y});else trail=[];lastTrail={x,y};if(trail.length>80)trail.shift();ctx.save();ctx.strokeStyle='#64e8ff';ctx.lineWidth=5;ctx.lineCap='round';ctx.shadowBlur=12;ctx.shadowColor='#64e8ff';ctx.beginPath();trail.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.restore()}else{trail=[];lastTrail=null}};
+// Reconfigure Hands to allow two hands while preserving the original detection pipeline.
+const _oldStart=startApp; startApp=async function(){await _oldStart()};
+$('faceToggle').onchange=()=>toast($('faceToggle').checked?'😊 Deteksi wajah aktif':'😊 Deteksi wajah mati'); $('drawToggle').onchange=()=>{trail=[];lastTrail=null;toast($('drawToggle').checked?'✍️ Tracking gambar aktif':'✍️ Tracking gambar mati')}; $('twoHandToggle').onchange=()=>toast($('twoHandToggle').checked?'👐 Tracking 2 tangan aktif':'👐 Tracking 2 tangan mati'); $('personToggle').onchange=()=>toast($('personToggle').checked?'🧍 Penghitung orang aktif':'🧍 Penghitung orang mati');
+</script>
+
+<style>
+:root{
+  --bg:#070914;--panel:rgba(18,22,42,.72);--panel2:rgba(24,29,54,.82);
+  --line:rgba(255,255,255,.10);--text:#f5f7ff;--muted:#9da6c4;
+  --cyan:#64e8ff;--purple:#9d7cff;--green:#62e6a8;--yellow:#ffe56b;
+  --danger:#ff6f91;--shadow:0 24px 70px rgba(0,0,0,.42);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;min-height:100vh;font-family:Inter,Segoe UI,system-ui,sans-serif;
+  color:var(--text);background:
+  radial-gradient(circle at 15% 15%,rgba(100,232,255,.12),transparent 28%),
+  radial-gradient(circle at 85% 20%,rgba(157,124,255,.13),transparent 30%),
+  linear-gradient(135deg,#060812,#0d1021 52%,#080a16);
+  overflow-x:hidden;
+}
+body:before{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.25;
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:34px 34px;mask-image:linear-gradient(to bottom,#000,transparent);
+}
+.app{width:min(1180px,94vw);margin:auto;padding:28px 0 45px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{
+  width:48px;height:48px;border-radius:16px;display:grid;place-items:center;font-size:25px;
+  background:linear-gradient(135deg,var(--cyan),var(--purple));box-shadow:0 0 35px rgba(100,232,255,.22)
+}
+.brand h1{font-size:20px;margin:0}.brand p{font-size:12px;color:var(--muted);margin:3px 0 0}
+.status{
+  display:flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--line);
+  background:rgba(255,255,255,.045);border-radius:999px;font-size:12px;color:var(--muted)
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--yellow);box-shadow:0 0 12px var(--yellow)}
+.dot.on{background:var(--green);box-shadow:0 0 12px var(--green)}
+.layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.75fr);gap:18px}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:24px;
+  box-shadow:var(--shadow);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)
+}
+.camera-card{padding:14px}
+.camera{
+  position:relative;overflow:hidden;border-radius:18px;background:#020308;min-height:300px
+}
+#video{display:none}
+#canvas{width:100%;height:auto;display:block;background:#000}
+.overlay{
+  position:absolute;left:14px;right:14px;top:14px;display:flex;justify-content:space-between;
+  pointer-events:none
+}
+.pill{padding:7px 10px;border-radius:999px;background:rgba(5,7,15,.66);border:1px solid rgba(255,255,255,.1);font-size:11px;backdrop-filter:blur(10px)}
+.corner{
+  position:absolute;width:26px;height:26px;border-color:var(--cyan);opacity:.8
+}
+.c1{left:12px;top:12px;border-left:2px solid;border-top:2px solid}.c2{right:12px;top:12px;border-right:2px solid;border-top:2px solid}
+.c3{left:12px;bottom:12px;border-left:2px solid;border-bottom:2px solid}.c4{right:12px;bottom:12px;border-right:2px solid;border-bottom:2px solid}
+.result{
+  margin-top:12px;padding:17px 18px;border-radius:18px;background:var(--panel2);
+  border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:15px
+}
+.result small{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}
+#output_text{font-size:clamp(20px,4vw,32px);font-weight:800;color:#fff}
+.conf{font-size:13px;color:var(--green);white-space:nowrap}
+.side{padding:20px}
+.side h2{font-size:16px;margin:0 0 14px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.metric{padding:13px;border-radius:15px;background:rgba(255,255,255,.045);border:1px solid var(--line)}
+.metric span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.metric b{display:block;margin-top:5px;font-size:20px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
+button{
+  border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);
+  border-radius:13px;padding:11px 10px;font-weight:700;cursor:pointer;transition:.2s
+}
+button:hover{transform:translateY(-2px);background:rgba(255,255,255,.1)}
+button.primary{grid-column:1/-1;background:linear-gradient(135deg,#24bdd8,#8064e9);border:0}
+button.danger{color:#ff9db2}
+.slider{margin-top:15px;padding:13px;border:1px solid var(--line);border-radius:15px}
+.slider label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px}
+input[type=range]{width:100%;accent-color:var(--cyan)}
+.history{margin-top:16px}
+.history-title{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:7px}
+#history{max-height:145px;overflow:auto}
+.history-item{padding:8px 9px;margin-bottom:5px;border-radius:10px;background:rgba(255,255,255,.04);font-size:11px}
+.history-item span{color:var(--muted);float:right}
+.tip{
+  margin-top:16px;padding:12px;border-radius:14px;background:rgba(100,232,255,.055);
+  border:1px solid rgba(100,232,255,.13);font-size:11px;line-height:1.55;color:#b8c5e7
+}
+#permission-screen{
+  position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:22px;
+  background:radial-gradient(circle at 50% 35%,rgba(100,232,255,.10),transparent 35%),#060812
+}
+.permission-card{width:min(440px,100%);padding:30px;border-radius:28px;text-align:center}
+.permission-icon{
+  width:74px;height:74px;margin:0 auto 17px;border-radius:24px;display:grid;place-items:center;font-size:34px;
+  background:linear-gradient(135deg,rgba(100,232,255,.18),rgba(157,124,255,.2));border:1px solid var(--line)
+}
+.permission-card h2{margin:0 0 8px;font-size:25px}.permission-card p{color:var(--muted);line-height:1.6;font-size:13px}
+.permission-actions{display:flex;gap:9px;margin-top:20px}.permission-actions button{flex:1}
+#denied-msg{color:#ff9db2;display:none;font-size:12px;margin-top:14px}
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  padding:11px 15px;border-radius:999px;background:#171c31;border:1px solid var(--line);font-size:12px;
+  transition:.3s;z-index:50;box-shadow:var(--shadow)
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.side{padding:16px}.app{width:96vw;padding-top:16px}}
+@media(max-width:480px){header{align-items:flex-start}.status{font-size:10px}.brand h1{font-size:17px}.brand p{font-size:10px}.controls{grid-template-columns:1fr 1fr}.permission-card{padding:24px}.result{align-items:flex-start;flex-direction:column}}
+
+.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}.feature{padding:12px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.045);display:flex;align-items:center;justify-content:space-between;gap:8px}.feature b{font-size:12px}.feature small{display:block;color:var(--muted);font-size:9px;margin-top:3px}.switch{position:relative;width:42px;height:23px}.switch input{display:none}.switch span{position:absolute;inset:0;border-radius:999px;background:#33384e}.switch span:before{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s}.switch input:checked+span{background:linear-gradient(90deg,var(--cyan),var(--purple))}.switch input:checked+span:before{transform:translateX(19px)}.camera-mode{display:flex;gap:7px;margin-top:10px}.camera-mode button{flex:1;font-size:10px}.creator{margin-top:18px;padding:13px;border-radius:15px;border:1px solid var(--line);background:rgba(255,255,255,.035);text-align:center}.creator small{color:var(--muted);display:block;font-size:9px;margin-bottom:5px}.creator a{color:var(--text);text-decoration:none;font-weight:800}.analysis{margin-top:16px;padding:12px;border-radius:15px;border:1px solid rgba(255,111,145,.16);background:rgba(255,111,145,.035);font-size:10px;line-height:1.55;color:#bac4df}@media(max-width:600px){.feature-grid{grid-template-columns:1fr}}
+</style>
+<script>
+</script>
+
+</head>
+
+<body>
+<div id="permission-screen">
+  <div class="permission-card card">
+    <div class="permission-icon">🖐️</div>
+    <h2>GestureAI</h2>
+    <p>Kamera digunakan untuk mendeteksi jumlah jari dan gesture tangan secara real-time. Kamera hanya digunakan di halaman ini.</p>
+    <div class="permission-actions">
+      <button onclick="cancelApp()">Tidak</button>
+      <button class="primary" onclick="startApp()">Iya, Aktifkan Kamera</button>
+    </div>
+    <div id="denied-msg"></div>
+  </div>
+</div>
+
+<main class="app">
+<header>
+  <div class="brand">
+    <div class="logo">✋</div>
+    <div><h1>GestureAI</h1><p>Smart Hand Tracking • MediaPipe</p></div>
+  </div>
+  <div class="status"><i class="dot" id="statusDot"></i><span id="statusText">Menunggu kamera</span></div>
+</header>
+
+<div class="layout">
+<section class="card camera-card">
+  <div class="camera" id="cameraBox">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <div class="overlay"><div class="pill" id="fpsBadge">FPS —</div><div class="pill" id="handBadge">NO HAND</div></div><div class="pill" id="eventBadge" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:0;transition:.2s"></div>
+    <i class="corner c1"></i><i class="corner c2"></i><i class="corner c3"></i><i class="corner c4"></i>
+  </div>
+  <div class="result">
+    <div><small>GESTURE TERDETEKSI</small><div id="output_text">Menunggu kamera…</div></div>
+    <div class="conf" id="confidenceText">—</div>
+  </div>
+</section>
+
+<aside class="card side">
+  <h2>Live Dashboard</h2>
+  <div class="metrics">
+    <div class="metric"><span>Jari</span><b id="fingerStat">—</b></div>
+    <div class="metric"><span>Tangan</span><b id="sideStat">—</b></div>
+    <div class="metric"><span>Confidence</span><b id="confidenceStat">—</b></div>
+    <div class="metric"><span>FPS</span><b id="fpsStat">—</b></div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" onclick="toggleVoice()" id="voiceBtn">🔊 Suara Aktif</button>
+    <button onclick="flipCamera()">🔄 Kamera</button>
+    <button onclick="takeSnapshot()">📸 Foto</button>
+    <button onclick="toggleFullscreen()">⛶ Fullscreen</button>
+    <button onclick="toggleTheme()">◐ Tema</button>
+  </div>
+
+  <div class="slider">
+    <label><span>Kecepatan suara</span><b id="rateValue">1.0×</b></label>
+    <input id="rateSlider" type="range" min=".5" max="1.8" step=".1" value="1">
+  </div>
+  <div class="feature-grid">
+    <div class="feature"><div><b>😊 Ekspresi Wajah</b><small>senang • marah • cemberut • senyum • ngakak</small></div><label class="switch"><input id="faceToggle" type="checkbox"><span></span></label></div>
+    <div class="feature"><div><b>✍️ Gambar Tangan</b><small>garis mengikuti ujung telunjuk</small></div><label class="switch"><input id="drawToggle" type="checkbox"><span></span></label></div>
+    <div class="feature"><div><b>👐 2 Tangan</b><small>hitung total jari 1–10</small></div><label class="switch"><input id="twoHandToggle" type="checkbox" checked><span></span></label></div>
+    <div class="feature"><div><b>🧍 Penghitung Orang</b><small>estimasi orang yang lewat</small></div><label class="switch"><input id="personToggle" type="checkbox"><span></span></label></div>
+  </div>
+  <div class="camera-mode"><button onclick="setCameraMode('user')">🤳 Kamera Depan</button><button onclick="setCameraMode('environment')">📷 Kamera Belakang</button></div>
+  <div class="creator"><small>WEBSITE CREATOR</small><a href="https://instagram.com/06_rissrama" target="_blank" rel="noopener">◎ Instagram @06_rissrama</a></div>
+  <div class="analysis"><b>Analisis bug:</b> tracking tangan memakai 2 tangan + confidence stabilisasi; garis gambar mengikuti landmark telunjuk; ekspresi dan penghitung orang dapat dimatikan untuk menjaga FPS.</div>
+
+  <div class="history">
+    <div class="history-title"><span>RIWAYAT GESTURE</span><button style="padding:4px 7px;font-size:10px" onclick="clearHistory()">Hapus</button></div>
+    <div id="history">Belum ada gesture.</div>
+  </div>
+
+  <div class="tip">💡 <b>Tips:</b> gunakan cahaya cukup, posisikan tangan di tengah kamera, dan hindari gerakan terlalu cepat agar tracking lebih stabil.</div>
+</aside>
+</div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const video=$('video'),canvas=$('canvas'),ctx=canvas.getContext('2d');
+let camera=null,hands=null,voice=true,facingMode='user',mirror=true;
+let lastSpoken=-1,stable=-1,stableFrames=0,lastFrame=performance.now(),frames=0;
+let historyData=[];
+
+function toast(msg){
+  const t=$('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>t.classList.remove('show'),2300);
+}
+function setStatus(text,on=false){
+  $('statusText').textContent=text;$('statusDot').classList.toggle('on',on);
+}
+function speak(text){
+  if(!voice||!('speechSynthesis'in window))return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);u.lang='id-ID';u.rate=+$('rateSlider').value;u.pitch=1;
+  speechSynthesis.speak(u);
+}
+$('rateSlider').oninput=()=>$('rateValue').textContent=(+$('rateSlider').value).toFixed(1)+'×';
+
+async function requestCamera(){
+  if(!window.isSecureContext){
+    throw new Error('SECURE_CONTEXT');
+  }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    throw new Error('NO_MEDIA');
+  }
+  const stream=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode,width:{ideal:640},height:{ideal:480}},audio:false
+  });
+  stream.getTracks().forEach(t=>t.stop());
+}
+function friendlyError(e){
+  if(e.name==='NotAllowedError')return 'Izin kamera ditolak. Buka ikon gembok di Chrome → Kamera → Izinkan.';
+  if(e.name==='NotFoundError')return 'Kamera tidak ditemukan.';
+  if(e.name==='NotReadableError')return 'Kamera sedang dipakai aplikasi lain.';
+  if(e.message==='SECURE_CONTEXT')return 'Chrome memerlukan HTTPS atau localhost untuk akses kamera.';
+  if(e.message==='NO_MEDIA')return 'Browser ini tidak mendukung akses kamera.';
+  return 'Kamera gagal dibuka. Coba muat ulang halaman.';
+}
+async function startApp(){
+  $('denied-msg').style.display='block';$('denied-msg').style.color='#9da6c4';
+  $('denied-msg').textContent='Memeriksa izin kamera…';setStatus('Memeriksa kamera');
+  try{
+    await requestCamera();
+    $('permission-screen').style.display='none';
+    setStatus('Mengaktifkan AI…');
+    initAI();
+  }catch(e){
+    console.error(e);
+    $('denied-msg').style.color='#ff9db2';$('denied-msg').textContent='⚠️ '+friendlyError(e);
+    setStatus('Kamera belum aktif');
+  }
+}
+function cancelApp(){
+  $('denied-msg').style.display='block';$('denied-msg').style.color='#9da6c4';
+  $('denied-msg').textContent='Akses kamera dibatalkan. Tekan “Iya, Aktifkan Kamera” jika ingin mencoba lagi.';
+  setStatus('Kamera tidak diaktifkan');
+}
+function initAI(){
+  hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+  hands.setOptions({maxNumHands:1,modelComplexity:1,minDetectionConfidence:.7,minTrackingConfidence:.7});
+  hands.onResults(onResults);
+  camera=new Camera(video,{
+    onFrame:async()=>{await hands.send({image:video})},
+    width:640,height:480
+  });
+  camera.start().then(()=>{
+    setStatus('Kamera aktif',true);$('output_text').textContent='Tunjukkan tanganmu';
+    speak('Kamera aktif. Silakan tunjukkan tangan anda.');
+  }).catch(e=>{
+    console.error(e);setStatus('Gagal mengaktifkan');toast(friendlyError(e));
+  });
+}
+function countFingers(l,h){
+  let n=0;const tips=[8,12,16,20],pips=[6,10,14,18];
+  for(let i=0;i<4;i++)if(l[tips[i]].y<l[pips[i]].y)n++;
+  if(h==='Right'){if(l[4].x<l[3].x)n++}else{if(l[4].x>l[3].x)n++}
+  return n;
+}
+function gesture(n){
+ const m={
+  0:['Kepalan tangan ✊','Nol jari'],1:['Hai 👋','Hai'],2:['Peace ✌️','Apa kabar?'],
+  3:['Luar biasa 🤟','Luar biasa!'],4:['Tetap semangat 🖖','Tetap semangat!'],5:['Sampai jumpa 🖐️','Sampai jumpa!']
+ };return m[n]||['Gesture tidak dikenali','Gesture tidak dikenali'];
+}
+function onResults(r){
+ ctx.save();ctx.clearRect(0,0,640,480);
+ if(mirror){ctx.translate(640,0);ctx.scale(-1,1)}
+ ctx.drawImage(r.image,0,0,640,480);ctx.setTransform(1,0,0,1,0,0);
+ frames++;const now=performance.now();
+ if(now-lastFrame>=1000){$('fpsBadge').textContent='FPS '+frames;$('fpsStat').textContent=frames;frames=0;lastFrame=now}
+ if(r.multiHandLandmarks?.length){
+  const l=r.multiHandLandmarks[0],h=r.multiHandedness[0].label,score=r.multiHandedness[0].score,n=countFingers(l,h);
+  drawConnectors(ctx,l,HAND_CONNECTIONS,{color:'#64e8ff',lineWidth:4});
+  drawLandmarks(ctx,l,{color:'#ff6f91',lineWidth:2});
+  $('handBadge').textContent=h.toUpperCase();$('fingerStat').textContent=n;
+  $('sideStat').textContent=h;$('confidenceStat').textContent=(score*100).toFixed(0)+'\%';$('confidenceText').textContent='● '+(score*100).toFixed(1)+'% confidence';
+  if(n===stable)stableFrames++;else{stable=n;stableFrames=1}
+  if(stableFrames>=5){
+   const [display,speech]=gesture(n);$('output_text').textContent=display;
+   if(n!==lastSpoken){speak(speech);addHistory(display,n);lastSpoken=n}
+  }
+ }else{
+  $('handBadge').textContent='NO HAND';$('fingerStat').textContent='—';$('sideStat').textContent='—';$('confidenceStat').textContent='—';$('confidenceText').textContent='—';$('output_text').textContent='Tangan tidak terdeteksi';lastSpoken=-1;stable=-1;stableFrames=0;
+ }
+ ctx.restore();
+}
+function addHistory(text,n){
+ const time=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+ historyData.unshift({text,n,time});historyData=historyData.slice(0,12);
+ $('history').innerHTML=historyData.map(x=>`<div class="history-item">🖐️ ${x.text}<span>${x.time}</span></div>`).join('');
+}
+function clearHistory(){historyData=[];$('history').textContent='Belum ada gesture.'}
+function toggleVoice(){
+ voice=!voice;$('voiceBtn').textContent=voice?'🔊 Suara Aktif':'🔇 Suara Mati';
+ if(!voice)speechSynthesis.cancel();else speak('Suara aktif');
+}
+function flipCamera(){
+ facingMode=facingMode==='user'?'environment':'user';mirror=facingMode==='user';
+ if(camera){camera.stop();setStatus('Mengganti kamera…');initAI()}
+}
+function takeSnapshot(){
+ const a=document.createElement('a');a.download='gestureai-'+Date.now()+'.png';a.href=canvas.toDataURL('image/png');a.click();toast('📸 Foto berhasil disimpan');
+}
+function toggleFullscreen(){
+ const el=$('cameraBox');
+ if(!document.fullscreenElement)el.requestFullscreen?.();else document.exitFullscreen?.();
+}
+function toggleTheme(){
+ document.body.classList.toggle('light');
+ if(document.body.classList.contains('light')){
+   document.documentElement.style.setProperty('--bg','#eef4ff');
+   toast('Mode terang belum mengubah kamera');
+ }else toast('Mode gelap aktif');
+}
+
+const _origInitAI=initAI; let latestFace=null,latestPose=null,trail=[],lastTrail=null,personCount=0,personVisible=false,lastPerson=0;
+function setCameraMode(mode){facingMode=mode;mirror=mode==='user';if(camera){camera.stop();setStatus('Mengganti kamera…');initAI()}}
+function faceExpression(l){const mouth=Math.hypot(l[13].x-l[14].x,l[13].y-l[14].y),width=Math.hypot(l[61].x-l[291].x,l[61].y-l[291].y),e=(Math.hypot(l[159].x-l[145].x,l[159].y-l[145].y)+Math.hypot(l[386].x-l[374].x,l[386].y-l[374].y))/2; if(mouth>.065&&e>.025)return ['Wajah ngakak 😂','Wajah ngakak']; if(width/(mouth+.0001)>5&&mouth>.018)return ['Wajah senyum 😄','Wajah senyum']; if(mouth<.018)return ['Wajah cemberut 😗','Wajah cemberut']; return ['Wajah senang 😊','Wajah senang']}
+function showEvent(t){const e=$('eventBadge');e.textContent=t;e.style.opacity=1;clearTimeout(window._ev);window._ev=setTimeout(()=>e.style.opacity=0,900)}
+const oldOnResults=onResults; onResults=function(r){oldOnResults(r); if($('drawToggle')?.checked&&r.multiHandLandmarks?.[0]){const l=r.multiHandLandmarks[0],x=(1-l[8].x)*640,y=l[8].y*480;if(lastTrail&&Math.hypot(x-lastTrail.x,y-lastTrail.y)<90)trail.push({x,y});else trail=[];lastTrail={x,y};if(trail.length>80)trail.shift();ctx.save();ctx.strokeStyle='#64e8ff';ctx.lineWidth=5;ctx.lineCap='round';ctx.shadowBlur=12;ctx.shadowColor='#64e8ff';ctx.beginPath();trail.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.restore()}else{trail=[];lastTrail=null}};
+// Reconfigure Hands to allow two hands while preserving the original detection pipeline.
+const _oldStart=startApp; startApp=async function(){await _oldStart()};
+$('faceToggle').onchange=()=>toast($('faceToggle').checked?'😊 Deteksi wajah aktif':'😊 Deteksi wajah mati'); $('drawToggle').onchange=()=>{trail=[];lastTrail=null;toast($('drawToggle').checked?'✍️ Tracking gambar aktif':'✍️ Tracking gambar mati')}; $('twoHandToggle').onchange=()=>toast($('twoHandToggle').checked?'👐 Tracking 2 tangan aktif':'👐 Tracking 2 tangan mati'); $('personToggle').onchange=()=>toast($('personToggle').checked?'🧍 Penghitung orang aktif':'🧍 Penghitung orang mati');
+</script>
+</body>
+</html>
